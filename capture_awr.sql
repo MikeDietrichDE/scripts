@@ -1,10 +1,10 @@
 -- -----------------------------------------------------------------------------------
--- File Name    : https://MikeDietrichDE.com/wp-content/scripts/12c/capture_awr.sql
+-- File Name    : https://github.com/MikeDietrichDE/scripts/blob/main/capture_awr.sql
 -- Author       : Mike Dietrich
 -- Description  : Capture SQL Statements from AWR into a SQL Tuning Set
 -- Requirements : Access to the DBA role.
 -- Call Syntax  : @capture_awr.sql
--- Last Modified: 31/05/2017
+-- Last Modified: 09/11/2023
 -- -----------------------------------------------------------------------------------
 
 SET SERVEROUT ON
