@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------------
--- File Name    :
+-- File Name    : https://github.com/MikeDietrichDE/scripts/blob/main/import_sts_stagingtable.sql
 -- Author       : Mike Dietrich
 -- Description  : Import a SQL Tuning Set from a staging table export
 -- Requirements : User TPCC needs READ, WRITE ON DIRECTORY DATA_PUMP_IMP
