@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------------
--- File Name    :
+-- File Name    : https://github.com/MikeDietrichDE/scripts/blob/main/export_sts_stagingtable.sql
 -- Author       : Mike Dietrich
 -- Description  : Pack a SQL Tuning Set into a staging table and export it
 -- Requirements : User TPCC needs READ, WRITE ON DIRECTORY DATA_PUMP_DIR
