@@ -3,7 +3,7 @@
 -- Author       : Mike Dietrich
 -- Description  : Run SQL Tuning Advisor on a SQL Tuning Set
 -- Requirements : Access to the DBA role.
--- Call Syntax  : @sta_ccr.sql
+-- Call Syntax  : @sta_cc.sql
 -- Last Modified: 06/11/2023
 -- -----------------------------------------------------------------------------------
 
@@ -47,7 +47,7 @@ BEGIN
         rank1        => 'BUFFER_GETS',
         time_limit   => 360,
         task_name    => 'STA_UPGRADE_TO_19C_CC',
-        description  => 'Tune AWR Workload for upgrade to 19c');
+        description  => 'Tune CC Workload for upgrade to 19c');
 
 
 
