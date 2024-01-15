@@ -13,7 +13,7 @@ column patch_id format 9999999999
 column ru_version format a15
 column lob_size_md format 9999
 COLUMN ru_build_ts FORMAT A20
-
+COLUMN SUBSTR(description,1,40) FORMAT A40
 
 set linesize 100
 set pagesize 300
@@ -29,6 +29,17 @@ SELECT
 FROM
     sys.registry$sqlpatch_ru_info;
 
+SELECT
+    patch_id,
+    SUBSTR(description,1,40) PATCH_DESCRIPTION,
+    TO_CHAR(source_build_timestamp, 'MM/DD/YYYY HH24:MI:SS') AS patch_build_ts,
+    round(dbms_lob.getlength(patch_directory) / 1024 / 1024) lob_size_mb
+FROM
+    sys.registry$sqlpatch
+WHERE
+    patch_type<>'RU';
+
+
 
 SELECT
    con_id, round(sum(dbms_lob.getlength(patch_directory) / 1024 / 1024)) total_lob_size_mba
@@ -38,3 +49,13 @@ GROUP BY
    con_id
 ORDER BY
    con_id;
+
+SELECT
+   con_id, round(sum(dbms_lob.getlength(patch_directory) / 1024 / 1024)) total_lob_size_mba
+FROM
+   containers(sys.registry$sqlpatch)
+GROUP BY
+   con_id
+ORDER BY
+   con_id;
+
