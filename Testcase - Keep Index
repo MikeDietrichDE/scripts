@@ -1,0 +1,128 @@
+set echo off
+set feedback on
+set pagesize 100
+set linesize 120
+set trimout on
+set trimspool on
+set tab off
+
+column constraint_name  format a30 heading 'Constraint'
+column constraint_type  format a4  heading 'Type'
+column table_name       format a25 heading 'Table'
+column index_name       format a30 heading 'Index'
+column uniqueness       format a10 heading 'Unique?'
+column status           format a10 heading 'Status'
+column constraint_state format a28 heading 'Constraint association'
+
+prompt
+prompt ============================================================
+prompt Constraint DROP ... KEEP INDEX testcase
+prompt ============================================================
+prompt
+
+prompt [1/6] Cleaning up a previous testcase, if it exists ...
+prompt SQL: DROP TABLE keep_index_test PURGE;
+begin
+  execute immediate 'drop table keep_index_test purge';
+exception
+  when others then
+    if sqlcode != -942 then
+      raise;
+    end if;
+end;
+/
+prompt Cleanup complete.
+prompt
+
+prompt [2/6] Creating test table KEEP_INDEX_TEST ...
+prompt SQL: CREATE TABLE keep_index_test (id NUMBER NOT NULL, payload VARCHAR2(30));
+create table keep_index_test (
+  id      number       not null,
+  payload varchar2(30)
+);
+prompt Table created.
+prompt
+
+prompt [3/6] Creating a separately named unique index ...
+prompt SQL: CREATE UNIQUE INDEX keep_index_test_uix ON keep_index_test (id);
+create unique index keep_index_test_uix
+  on keep_index_test (id);
+prompt Unique index KEEP_INDEX_TEST_UIX created.
+prompt
+
+prompt Creating primary-key constraint KEEP_INDEX_TEST_PK using this index ...
+prompt SQL: ALTER TABLE keep_index_test ADD CONSTRAINT keep_index_test_pk PRIMARY KEY (id) USING INDEX keep_index_test_uix;
+alter table keep_index_test
+  add constraint keep_index_test_pk
+  primary key (id)
+  using index keep_index_test_uix;
+prompt Primary-key constraint created.
+prompt
+
+prompt Current primary-key constraint and its supporting index:
+prompt SQL: SELECT constraint and index details for KEEP_INDEX_TEST;
+select c.constraint_name,
+       c.constraint_type,
+       c.table_name,
+       c.index_name,
+       i.uniqueness,
+       i.status
+from   user_constraints c
+join   user_indexes i
+       on i.index_name = c.index_name
+where  c.table_name = 'KEEP_INDEX_TEST'
+and    c.constraint_type = 'P';
+
+prompt Additional check to visulaize index, pk and constraint:
+select c.constraint_name,
+       c.constraint_type,
+       c.table_name,
+       c.index_name
+from   user_constraints c
+where  c.table_name = 'KEEP_INDEX_TEST';
+
+prompt
+prompt [4/6] Dropping the primary-key constraint with KEEP INDEX ...
+prompt SQL: ALTER TABLE keep_index_test DROP CONSTRAINT keep_index_test_pk KEEP INDEX;
+alter table keep_index_test
+  drop constraint keep_index_test_pk keep index;
+prompt Primary-key constraint dropped; the unique index should remain.
+prompt
+
+prompt [5/6] Proof: no primary-key or unique constraint remains on this table:
+prompt SQL: SELECT ... FROM user_constraints WHERE table_name = 'KEEP_INDEX_TEST' AND constraint_type IN ('P','U');
+select c.constraint_name,
+       c.constraint_type,
+       c.table_name,
+       c.index_name
+from   user_constraints c
+where  c.table_name = 'KEEP_INDEX_TEST'
+and    c.constraint_type in ('P', 'U');
+
+prompt
+prompt Expected result: no rows selected.
+prompt The primary key has been dropped.
+prompt
+
+prompt [6/6] Proof: the retained index still exists but has no PK/unique constraint:
+prompt SQL: SELECT ... FROM user_indexes LEFT JOIN user_constraints ... WHERE table_name = 'KEEP_INDEX_TEST';
+select i.index_name,
+       i.table_name,
+       i.uniqueness,
+       i.status,
+       case
+         when c.constraint_name is null then 'Not a PK/unique constraint'
+         else 'Used by ' || c.constraint_name
+       end as constraint_state
+from   user_indexes i
+left join user_constraints c
+       on c.index_name = i.index_name
+      and c.constraint_type in ('P', 'U')
+where  i.table_name = 'KEEP_INDEX_TEST';
+
+prompt
+prompt Expected result:
+prompt KEEP_INDEX_TEST_UIX remains UNIQUE, but its constraint association is
+prompt shown as "Not a PK/unique constraint".
+prompt ============================================================
+prompt
