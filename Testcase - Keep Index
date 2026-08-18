@@ -1,26 +1,29 @@
 set echo off
 set feedback on
 set pagesize 100
-set linesize 120
+set linesize 130
 set trimout on
 set trimspool on
 set tab off
 
+column owner            format a15 heading 'Owner'
 column constraint_name  format a30 heading 'Constraint'
 column constraint_type  format a4  heading 'Type'
 column table_name       format a25 heading 'Table'
 column index_name       format a30 heading 'Index'
 column uniqueness       format a10 heading 'Unique?'
 column status           format a10 heading 'Status'
-column constraint_state format a28 heading 'Constraint association'
+column constraint_index format a11 heading 'Constraint?'
+column constraint_state format a32 heading 'Constraint association'
+column assessment       format a58 heading 'Assessment'
 
 prompt
-prompt ============================================================
+prompt ==================================================================
 prompt Constraint DROP ... KEEP INDEX testcase
-prompt ============================================================
+prompt ==================================================================
 prompt
 
-prompt [1/6] Cleaning up a previous testcase, if it exists ...
+prompt [1/7] Cleaning up a previous testcase, if it exists ...
 prompt SQL: DROP TABLE keep_index_test PURGE;
 begin
   execute immediate 'drop table keep_index_test purge';
@@ -34,7 +37,7 @@ end;
 prompt Cleanup complete.
 prompt
 
-prompt [2/6] Creating test table KEEP_INDEX_TEST ...
+prompt [2/7] Creating test table KEEP_INDEX_TEST ...
 prompt SQL: CREATE TABLE keep_index_test (id NUMBER NOT NULL, payload VARCHAR2(30));
 create table keep_index_test (
   id      number       not null,
@@ -43,86 +46,126 @@ create table keep_index_test (
 prompt Table created.
 prompt
 
-prompt [3/6] Creating a separately named unique index ...
-prompt SQL: CREATE UNIQUE INDEX keep_index_test_uix ON keep_index_test (id);
-create unique index keep_index_test_uix
-  on keep_index_test (id);
-prompt Unique index KEEP_INDEX_TEST_UIX created.
-prompt
-
-prompt Creating primary-key constraint KEEP_INDEX_TEST_PK using this index ...
-prompt SQL: ALTER TABLE keep_index_test ADD CONSTRAINT keep_index_test_pk PRIMARY KEY (id) USING INDEX keep_index_test_uix;
+prompt [3/7] Creating a primary key and its supporting unique index ...
+prompt SQL: ALTER TABLE ... ADD CONSTRAINT ... PRIMARY KEY ... USING INDEX (CREATE UNIQUE INDEX ...);
 alter table keep_index_test
   add constraint keep_index_test_pk
   primary key (id)
-  using index keep_index_test_uix;
-prompt Primary-key constraint created.
+  using index (
+    create unique index keep_index_test_uix
+      on keep_index_test (id)
+  );
+
+prompt Primary-key constraint KEEP_INDEX_TEST_PK created.
+prompt Supporting index KEEP_INDEX_TEST_UIX created.
 prompt
 
 prompt Current primary-key constraint and its supporting index:
 prompt SQL: SELECT constraint and index details for KEEP_INDEX_TEST;
-select c.constraint_name,
+select c.owner,
+       c.constraint_name,
        c.constraint_type,
        c.table_name,
        c.index_name,
        i.uniqueness,
-       i.status
-from   user_constraints c
-join   user_indexes i
-       on i.index_name = c.index_name
-where  c.table_name = 'KEEP_INDEX_TEST'
+       i.status,
+       i.constraint_index
+from   dba_constraints c
+join   dba_indexes i
+       on i.owner      = c.index_owner
+      and i.index_name = c.index_name
+where  c.owner = user
+and    c.table_name = 'KEEP_INDEX_TEST'
 and    c.constraint_type = 'P';
 
-prompt Additional check to visulaize index, pk and constraint:
-select c.constraint_name,
-       c.constraint_type,
-       c.table_name,
-       c.index_name
-from   user_constraints c
-where  c.table_name = 'KEEP_INDEX_TEST';
-
 prompt
-prompt [4/6] Dropping the primary-key constraint with KEEP INDEX ...
+prompt Expected result:
+prompt KEEP_INDEX_TEST_PK is the primary-key constraint.
+prompt KEEP_INDEX_TEST_UIX is its supporting unique index.
+prompt
+
+prompt [4/7] Dropping the primary-key constraint while retaining the index ...
 prompt SQL: ALTER TABLE keep_index_test DROP CONSTRAINT keep_index_test_pk KEEP INDEX;
 alter table keep_index_test
   drop constraint keep_index_test_pk keep index;
-prompt Primary-key constraint dropped; the unique index should remain.
+prompt Primary-key constraint dropped. The index should remain.
 prompt
 
-prompt [5/6] Proof: no primary-key or unique constraint remains on this table:
-prompt SQL: SELECT ... FROM user_constraints WHERE table_name = 'KEEP_INDEX_TEST' AND constraint_type IN ('P','U');
-select c.constraint_name,
+prompt [5/7] Proof: no primary-key or unique constraint remains ...
+prompt SQL: SELECT ... FROM dba_constraints WHERE owner = USER AND table_name = 'KEEP_INDEX_TEST' AND constraint_type IN ('P','U');
+select c.owner,
+       c.constraint_name,
        c.constraint_type,
        c.table_name,
        c.index_name
-from   user_constraints c
-where  c.table_name = 'KEEP_INDEX_TEST'
+from   dba_constraints c
+where  c.owner = user
+and    c.table_name = 'KEEP_INDEX_TEST'
 and    c.constraint_type in ('P', 'U');
 
 prompt
 prompt Expected result: no rows selected.
-prompt The primary key has been dropped.
+prompt The primary-key constraint has been removed.
 prompt
 
-prompt [6/6] Proof: the retained index still exists but has no PK/unique constraint:
-prompt SQL: SELECT ... FROM user_indexes LEFT JOIN user_constraints ... WHERE table_name = 'KEEP_INDEX_TEST';
-select i.index_name,
+prompt [6/7] Proof: the retained index still exists but enforces no constraint ...
+prompt SQL: SELECT retained index and any current PK/unique constraint association;
+select i.owner,
        i.table_name,
+       i.index_name,
        i.uniqueness,
        i.status,
+       i.constraint_index,
        case
-         when c.constraint_name is null then 'Not a PK/unique constraint'
+         when c.constraint_name is null then 'No current PK/unique constraint'
          else 'Used by ' || c.constraint_name
        end as constraint_state
-from   user_indexes i
-left join user_constraints c
-       on c.index_name = i.index_name
+from   dba_indexes i
+left join dba_constraints c
+       on c.index_owner = i.owner
+      and c.index_name  = i.index_name
       and c.constraint_type in ('P', 'U')
-where  i.table_name = 'KEEP_INDEX_TEST';
+where  i.owner = user
+and    i.table_name = 'KEEP_INDEX_TEST';
 
 prompt
 prompt Expected result:
-prompt KEEP_INDEX_TEST_UIX remains UNIQUE, but its constraint association is
-prompt shown as "Not a PK/unique constraint".
-prompt ============================================================
+prompt KEEP_INDEX_TEST_UIX remains as a unique index.
+prompt It has no current PK/unique constraint association.
+prompt
+
+prompt [7/7] Listing candidate unique indexes with no current PK/unique constraint ...
+prompt SQL: Find candidate standalone unique indexes using DBA views;
+select i.owner,
+       i.table_name,
+       i.index_name,
+       i.tablespace_name,
+       i.status,
+       i.uniqueness,
+       i.constraint_index,
+       'Candidate only - DBA views cannot prove KEEP INDEX history'
+         as assessment
+from   dba_indexes i
+where  i.owner = user
+and    i.table_name = 'KEEP_INDEX_TEST'
+and    i.uniqueness = 'UNIQUE'
+and    not exists (
+         select 1
+         from   dba_constraints c
+         where  c.index_owner = i.owner
+         and    c.index_name  = i.index_name
+         and    c.constraint_type in ('P', 'U')
+       )
+order by i.owner, i.index_name;
+
+prompt
+prompt ==================================================================
+prompt Expected final result: KEEP_INDEX_TEST_UIX is returned.
+prompt It is a unique index with no current PK/unique constraint.
+prompt
+prompt Important: DBA views cannot prove that it was retained specifically
+prompt through DROP CONSTRAINT ... KEEP INDEX. They only prove that no such
+prompt constraint exists now. Historical proof requires captured DDL auditing,
+prompt deployment logs, or other change-management evidence.
+prompt ==================================================================
 prompt
