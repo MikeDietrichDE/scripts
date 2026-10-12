@@ -1,3 +1,18 @@
+-- This query will measure the minimum SGA size for upgrades and patching
+-- to Oracle AI Database 26ai Release Update 23.26.3 and newer.
+-- The minimum SGA allocation algorith has been changed.
+-- You may need to increase your SGA size in the target version.
+-- https://mikedietrichde.com/2026/10/13/oracle-23-26-3-may-require-a-larger-sga-than-previous-releases/
+--
+-- Mike Dietrich -- 2026-10-12
+--
+-- Please use with caution - this is not an official Oracle script
+--
+-- This version of the scripts asks you for your CPU count in case you move to
+-- a different system. Store it in a file, and call it from SQL Plus.
+--
+---------------------------------------------------------------------------------------
+
 ACCEPT target_cpu_count NUMBER PROMPT 'Please insert your desired CPU_COUNT for the target environment: '
 
 WITH
